@@ -8,8 +8,13 @@ class Camara:
             self.__class__.cap = cv2.VideoCapture(0)
         self.camara = self.__class__.cap
 
-    def leer_camara(self):
+    def read(self):
         _, frame = self.camara.read()
         cv2.imshow('Frame', frame)
-        cv2.waitKey(0)
 
+if __name__ == '__main__':
+    camara = Camara()
+    while True:
+        camara.read()
+        if(cv2.waitKey(10) & 0xFF == ord('b')):
+            break
