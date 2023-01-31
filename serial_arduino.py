@@ -1,3 +1,4 @@
+# sudo chmod 666 /dev/ttyACM0
 import serial
 
 class Arduino:
@@ -9,11 +10,12 @@ class Arduino:
         self.ser = self.__class__.ser
 
     def sendCommand(self, command):
+        command = command+"\n"
         self.ser.write(command.encode('utf_8'))
-        print(self.ser.readline())
+        print(self.ser.readline().decode())
         
 if __name__ == '__main__':
     arduino = Arduino()
     while True:
-        comand = input('Ingrese comando: ')
-        arduino.sendCommand(comand)
+        command = input('Ingrese comando: ')
+        arduino.sendCommand(command)
