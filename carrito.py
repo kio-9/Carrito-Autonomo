@@ -36,7 +36,7 @@ class Carrito:
         ctrls = "Controles:\n\tw: avanzar\n\ta: izquierda\n\ts: stop\n\td: derecha\n\tx: retroceder"
         print(ctrls)
 
-    def sendArduino(self):
+    def encodeArduino(self):
         if self.change is None:
             return
         if self.change == 'a':
@@ -56,4 +56,4 @@ class Carrito:
         self.showControls()
         while True:
             self.move(input('Ingrese comando: '))
-            self.sendArduino()
+            self.encodeArduino()

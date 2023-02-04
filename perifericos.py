@@ -1,4 +1,7 @@
 import cv2
+import pickle
+import socket
+import struct
 import serial
 from threading import Thread
 from queue import Queue
@@ -15,6 +18,10 @@ class Camara:
         self.camara = self.__class__.cap
         self.stopped = False
         self.Q = Queue(maxsize=queueSize)
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect(('192.168.18.143', 8485))
+        self.encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]
+        self.img_counter = 0
 
     def start(self):
         t = Thread(target=self.update, args=())
@@ -33,6 +40,27 @@ class Camara:
 
     def read(self):
         return self.Q.get()
+
+    def transmitFrames(self):
+        t = Thread(target=self.transmit, args=())
+        t.daemon = True
+        t.start()
+        return self
+
+    def transmit(self):
+        while True:
+            print(f'Tamaño de la cola: {self.Q.qsize()}')
+            if self.stopped:
+                return
+            _, image = cv2.imencode('.jpg', self.read(), self.encode_param)
+            data = pickle.dumps(image, 0)
+            size = len(data)
+
+            if self.img_counter%10==0:
+                self.client_socket.sendall(struct.pack(">L", size) + data)
+                print(f'Tamaño de la cola luego de enviar: {self.Q.qsize()}')
+                
+            self.img_counter += 1
 
     def showFrames(self):
         t = Thread(target=self.show, args=())
@@ -76,7 +104,7 @@ class Arduino:
 if __name__ == '__main__':
     opt = input('Opciones:\n\t1->camara\n\t2->motores\nIngrese una opcion: ')
     if opt=='1':
-        cam = Camara().start().showFrames()
+        cam = Camara().start().transmitFrames()
         while True:
             comando = input('Ingrese comando: ')
             print(f'Comando ingresado: {comando}')
