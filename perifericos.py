@@ -1,8 +1,5 @@
 import cv2
 import numpy as np
-import pickle
-import socket
-import struct
 import serial
 from threading import Thread
 from queue import Queue
@@ -20,14 +17,9 @@ class Camara:
         self.stopped = False
         self.Q = Queue(maxsize=queueSize)
         self.Q_show = Queue(maxsize=queueSize)
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]
-        self.remote = remote
         self.img_counter = 0
         self.houghParams = [6,0.15,258]
-        # testing
-        self.a = 4.2
-        self.b = 45
 
     def start(self):
         t = Thread(target=self.update, args=())
@@ -49,41 +41,8 @@ class Camara:
     def read(self):
         return self.Q.get()
 
-    def lineDetector(self):
-        return
-
-    def showFrames(self):
-        if self.remote:
-            url = input('Ingrese dirección IP: ') #'4.tcp.ngrok.io'
-            port = int(input('Ingrese puerto: '))
-            self.client_socket.connect((url, port))
-        t = Thread(target=self.show, args=())
-        t.daemon = True
-        t.start()
-        return self
-
-    def show(self):
-        t_ant = time()
-        while True:
-            if self.stopped:
-                break
-            frame = self.Q_show.get()
-            fps = 1/(time()-t_ant)
-            cv2.putText(frame, f"FPS: {30 if fps>30 else fps:.1f}",(520, 30), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            t_ant = time()
-            if not self.remote:
-                cv2.imshow('Frame', frame)
-                cv2.waitKey(1)
-                continue
-            # Transmit data
-            _, image = cv2.imencode('.jpg', frame, self.encode_param)
-            data = pickle.dumps(image, 0)
-            size = len(data)
-            self.client_socket.sendall(struct.pack(">fhL", self.a, self.b, size) + data)
-            # print(f'Tamaño de la cola luego de enviar: {self.Q.qsize()}')
-            self.img_counter += 1
-        cv2.destroyAllWindows()
+    def getFrames(self):
+        return self.Q_show.get()
 
     def detectLines(self):
         t = Thread(target=self.detect, args=())
@@ -174,7 +133,7 @@ if __name__ == '__main__':
                 break
     else:
         opt = input('1->Local, 2->remoto : ')
-        cam = Camara(remote=True if opt=='2' else False).start().detectLines().showFrames()
+        cam = Camara(remote=True if opt=='2' else False).start().detectLines()
         while True:
             command = input('Params: ')
             if command == 'i':
