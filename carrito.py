@@ -11,13 +11,17 @@ ANG_LIMIT = 70
 
 class Carrito:
 
-    def __init__(self, remote=False):
+    def __init__(self, remote=False, segmentateCam = False):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.camara = Camara()
+        self.encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]
+        self.camara = Camara(segmentate=segmentateCam)
         # self.arduino = Arduino()
         self.remote = remote
+        if remote:
+            self.connect2Server()
         self.ang = 20
         self.vel = 0
+        self.img_counter = 0
         self.change = None
         self.stopped = False
 
@@ -63,24 +67,26 @@ class Carrito:
 
     def teleop(self):
         self.showControls()
-        self.camara.showInfo()
+        self.showInfo()
         while True:
             com = input('Ingrese comando: ')
             if com =='q':
                 self.stopped=True
-                camara.stop()
+                self.camara.stop()
                 print('Saliendo del modo teleoperado')
                 sleep(1)
                 return
             self.move(com)
             self.encodeArduino()
 
+    def connect2Server(self):
+        url = input('Ingrese dirección IP: ') #'4.tcp.ngrok.io'
+        port = int(input('Ingrese puerto: '))
+        self.client_socket.connect((url, port))
+        self.client_socket.sendall(struct.pack(">hh", *self.camara.getImgSize()))
+
     def showInfo(self):
         self.camara.start()
-        if self.remote:
-            url = input('Ingrese dirección IP: ') #'4.tcp.ngrok.io'
-            port = int(input('Ingrese puerto: '))
-            self.client_socket.connect((url, port))
         t = Thread(target=self.show, args=())
         t.daemon = True
         t.start()
@@ -104,25 +110,29 @@ class Carrito:
             _, image = cv2.imencode('.jpg', frame, self.encode_param)
             data = pickle.dumps(image, 0)
             size = len(data)
-            self.client_socket.sendall(struct.pack(">fhL", self.vel, self.ang, size) + data)
+            self.client_socket.sendall(struct.pack(">hfhL", self.img_counter, self.vel, self.ang, size) + data)
             # print(f'Tamaño de la cola luego de enviar: {self.Q.qsize()}')
             self.img_counter += 1
         cv2.destroyAllWindows()
 
+    def stop(self):
+        self.stopped = True
+
+    def configDeteccion(self):
+        self.camara.detectLines()
+        while True:
+            command = input('Params: ')
+            if command == 'i':
+                print(car.camara.houghParams)
+                continue
+            try:
+                key = int(command[0])
+            except:
+                self.stop()
+                sleep(1)
+                break
+            self.camara.houghParams[key]=int(command[1:]) if key!=1 else int(command[1:])/100
+
 if __name__ == '__main__':
     opt = input('1->Local, 2->remoto : ')
     car = Carrito(remote=True if opt=='2' else False).showInfo()
-    car.camara.detectLines()
-    while True:
-        command = input('Params: ')
-        if command == 'i':
-            print(car.camara.houghParams)
-            continue
-        try:
-            key = int(command[0])
-        except:
-            car.stop()
-            sleep(1)
-            break
-        car.camara.houghParams[key]=int(command[1:]) if key!=1 else int(command[1:])/100
-
