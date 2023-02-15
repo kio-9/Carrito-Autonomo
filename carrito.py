@@ -15,7 +15,10 @@ class Carrito:
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]
         self.camara = Camara(segmentate=segmentateCam)
-        # self.arduino = Arduino()
+        try:
+            self.arduino = Arduino()
+        except:
+            print("arduino no conectado")
         self.remote = remote
         if remote:
             self.connect2Server()
@@ -86,18 +89,20 @@ class Carrito:
         self.client_socket.sendall(struct.pack(">hh", *self.camara.getImgSize()))
 
     def showInfo(self):
-        self.camara.start()
         t = Thread(target=self.show, args=())
         t.daemon = True
         t.start()
         return self
 
     def show(self):
+        self.camara.start()
         t_ant = time()
         while True:
             if self.stopped:
                 break
             frame = self.camara.getFrames()
+            curr_vel=self.vel
+            curr_ang=self.ang
             fps = 1/(time()-t_ant)
             cv2.putText(frame, f"FPS: {30 if fps>30 else fps:.1f}",(520, 30), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
@@ -106,19 +111,25 @@ class Carrito:
                 cv2.imshow('Frame', frame)
                 cv2.waitKey(1)
                 continue
+            self.img_counter += 1
             # Transmit data
-            _, image = cv2.imencode('.jpg', frame, self.encode_param)
+            if self.img_counter % 20 != 0:
+               continue
+            t_ant1 = time()
+            _, image = cv2.imencode('.jpg', frame, self.encode_param)  
             data = pickle.dumps(image, 0)
             size = len(data)
-            self.client_socket.sendall(struct.pack(">hfhL", self.img_counter, self.vel, self.ang, size) + data)
+            self.client_socket.sendall(struct.pack(">hfhL", self.img_counter, curr_vel, curr_ang, size) + data)
+            print(time()-t_ant1)
             # print(f'Tamaño de la cola luego de enviar: {self.Q.qsize()}')
-            self.img_counter += 1
+            
         cv2.destroyAllWindows()
 
     def stop(self):
         self.stopped = True
 
     def configDeteccion(self):
+        self.showInfo()
         self.camara.detectLines()
         while True:
             command = input('Params: ')

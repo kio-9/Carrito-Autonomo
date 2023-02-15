@@ -11,11 +11,13 @@ class Camara:
     def __init__(self, queueSize=128, size=(640, 480), segmentate=False):
         self.size = size
         self.segmentate = segmentate
-        if self.__class__.cap is None and self.conectarCamara():
+        if self.__class__.cap is None:
+            self.__class__.cap = cv2.VideoCapture(0)
             self.__class__.cap.set(cv2.CAP_PROP_FRAME_WIDTH, size[0])
             self.__class__.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, size[1])
         self.camara = self.__class__.cap
         self.stopped = False
+        self.flag_detec = None
         self.Q = Queue(maxsize=queueSize)
         self.Q_show = Queue(maxsize=queueSize)
         self.houghParams = [6,0.15,258]
@@ -57,10 +59,14 @@ class Camara:
         return self.Q.get()
 
     def getFrames(self):
-        return self.Q_show.get()
+        if self.flag_detec is None:
+           return self.read()
+        else:
+           return self.Q_show.get()
 
     def detectLines(self):
         t = Thread(target=self.detect, args=())
+        self.flag_detec = True
         t.daemon = True
         t.start()
         return self
@@ -116,8 +122,8 @@ class Arduino:
     ser = None
 
     def __init__(self):
-        if self.__class__.ser is None and not self.conectarArduino():
-            return
+        if self.__class__.ser is None:
+            self.__class__.ser = serial.Serial('/dev/ttyUSB0', baudrate=115200)
         self.ser = self.__class__.ser
 
     def conectarArduino(self):
