@@ -5,6 +5,7 @@ import socket
 import struct
 from threading import Thread
 from time import time, sleep
+from prueba2_controlre import *
 
 VEL_LIMIT = 300
 ANG_LIMIT = 70
@@ -28,24 +29,23 @@ class Carrito:
         self.change = None
         self.stopped = False
 
-    def move(self, comm):
-        if comm not in 'wasdx':
-            print('Comando no válido')
+    def move(self, comm,valor):
+        if not comm:
             return
-        if comm == 'w' and self.vel < VEL_LIMIT:
-            self.vel += 1
+        if comm == 'w' and valor < VEL_LIMIT:
+            self.vel = valor
             self.change = 'v'
-        elif comm == 'a' and self.ang < ANG_LIMIT:
-            self.ang += 5
+        elif comm == 'a' and valor < ANG_LIMIT:
+            self.ang = valor
             self.change = 'a'
         elif comm == 's':
             self.vel = 0
             self.change = 'v'
-        elif comm == 'd' and self.ang > 0:
-            self.ang -= 5
+        elif comm == 'd' and valor > 0:
+            self.ang = valor
             self.change = 'a'
-        elif comm == 'x' and self.vel > -VEL_LIMIT:
-            self.vel -= 1
+        elif comm == 'x' and valor > -VEL_LIMIT:
+            self.vel =valor
             self.change = 'v'
 
     def showControls(self):
@@ -61,30 +61,36 @@ class Carrito:
             comm = 'G0'
         else:
             sign = '+' if self.vel >= 0 else ''
-            num = 3 if self.vel > 0 else -3
-            num += self.vel/100
-            comm = f'G{sign}{num:.2f}'
+            comm = f'G{sign}{self.vel:.2f}'
         print(comm)
-        self.arduino.sendCommand(comm)
+        #self.arduino.sendCommand(comm)
         self.change = None
 
     def teleop(self):
+        mando = Controller(debug=True)
         self.showControls()
-        self.showInfo()
+        #self.showInfo()
         while True:
-            com = input('Ingrese comando: ')
+            #com = input('Ingrese comando: ')
+            com,valor=mando.leer_mando()
             if com =='q':
                 self.stopped=True
                 self.camara.stop()
                 print('Saliendo del modo teleoperado')
                 sleep(1)
                 return
-            self.move(com)
+            self.move(com,valor)
             self.encodeArduino()
 
     def connect2Server(self):
-        url = input('Ingrese dirección IP: ') #'4.tcp.ngrok.io'
-        port = int(input('Ingrese puerto: '))
+        fh=open("ip.txt")
+        ip=[line.rstrip() for line in fh]
+        url = input(f'Ingrese dirección IP ({ip[0]}): ') #'4.tcp.ngrok.io'
+        if not url:
+            url=ip[0]
+        port =input(f'Ingrese puerto ({ip[1]}): ')
+        if not port:
+            port=int(ip[1])
         self.client_socket.connect((url, port))
         self.client_socket.sendall(struct.pack(">hh", *self.camara.getImgSize()))
 
