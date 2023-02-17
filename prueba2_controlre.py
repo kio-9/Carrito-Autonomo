@@ -120,18 +120,18 @@ class Controller:
                        comando='p'
                    elif event.code == self.cuadrado_Btn:
                        if self.debug:
-                           print("cuadrado,ak-izq")
+                           print("cuadrado, 1")
                        Vel = 1
-                       comando='n'
+                       comando='1'
                    elif event.code == self.triangulo_Btn:
                        if self.debug:
-                           print("triangulo,safestop")
-                       comando='s'
+                           print("triangulo, 2")
+                       comando='2'
                    elif event.code == self.circulo_Btn:
                        if self.debug:
-                           print("circulo,ak-der")
+                           print("circulo, 3")
                        Vel = -1
-                       comando='m'
+                       comando='3'
                    elif event.code == self.l1_Btn:
                        if self.debug:
                            print("salir")

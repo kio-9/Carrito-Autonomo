@@ -20,6 +20,7 @@ class Carrito:
             self.arduino = Arduino()
         except:
             print("arduino no conectado")
+            self.arduino = None
         self.remote = remote
         if remote:
             self.connect2Server()
@@ -63,13 +64,14 @@ class Carrito:
             sign = '+' if self.vel >= 0 else ''
             comm = f'G{sign}{self.vel:.2f}'
         print(comm)
-        #self.arduino.sendCommand(comm)
+        if self.arduino is not None:
+            self.arduino.sendCommand(comm)
         self.change = None
 
     def teleop(self):
         mando = Controller(debug=True)
         self.showControls()
-        #self.showInfo()
+        self.showInfo()
         while True:
             #com = input('Ingrese comando: ')
             com,valor=mando.leer_mando()
@@ -83,15 +85,18 @@ class Carrito:
             self.encodeArduino()
 
     def connect2Server(self):
-        fh=open("ip.txt")
+        fh=open("ip.txt", 'r')
         ip=[line.rstrip() for line in fh]
         url = input(f'Ingrese dirección IP ({ip[0]}): ') #'4.tcp.ngrok.io'
         if not url:
             url=ip[0]
         port =input(f'Ingrese puerto ({ip[1]}): ')
         if not port:
-            port=int(ip[1])
-        self.client_socket.connect((url, port))
+            port=ip[1]
+        if url != ip[0] or port != ip[1]:
+            with open("ip.txt", 'w') as f:
+                f.write('\n'.join([url, port]))
+        self.client_socket.connect((url, int(port)))
         self.client_socket.sendall(struct.pack(">hh", *self.camara.getImgSize()))
 
     def showInfo(self):
@@ -102,31 +107,31 @@ class Carrito:
 
     def show(self):
         self.camara.start()
-        t_ant = time()
+        #t_ant = time()
         while True:
             if self.stopped:
                 break
             frame = self.camara.getFrames()
             curr_vel=self.vel
             curr_ang=self.ang
-            fps = 1/(time()-t_ant)
-            cv2.putText(frame, f"FPS: {30 if fps>30 else fps:.1f}",(520, 30), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            t_ant = time()
+            #fps = 1/(time()-t_ant)
+            #cv2.putText(frame, f"FPS: {30 if fps>30 else fps:.1f}",(520, 30), 
+                        #cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            #t_ant = time()
             if not self.remote:
                 cv2.imshow('Frame', frame)
                 cv2.waitKey(1)
                 continue
             self.img_counter += 1
             # Transmit data
-            if self.img_counter % 20 != 0:
+            if self.img_counter % 10 != 0:
                continue
-            t_ant1 = time()
+            #t_ant1 = time()
             _, image = cv2.imencode('.jpg', frame, self.encode_param)  
             data = pickle.dumps(image, 0)
             size = len(data)
             self.client_socket.sendall(struct.pack(">hfhL", self.img_counter, curr_vel, curr_ang, size) + data)
-            print(time()-t_ant1)
+            #print(time()-t_ant1)
             # print(f'Tamaño de la cola luego de enviar: {self.Q.qsize()}')
             
         cv2.destroyAllWindows()

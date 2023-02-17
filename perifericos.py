@@ -125,6 +125,7 @@ class Arduino:
         if self.__class__.ser is None:
             self.__class__.ser = serial.Serial('/dev/ttyUSB0', baudrate=115200)
         self.ser = self.__class__.ser
+        # self.sendCommand('S20')
 
     def conectarArduino(self):
         for i in range(2):
