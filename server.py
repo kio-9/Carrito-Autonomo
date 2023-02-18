@@ -12,7 +12,7 @@ from time import time
 import sqlite3
 
 HOST=''
-PORT=8000
+PORT=8485
 
 class DataBase:
     dbName = 'datos.sqlite'
@@ -84,6 +84,8 @@ class VideoReception(DataBase):
             self.saveVideo()
 
     def saveVideo(self):
+        if not self.videoName:
+            return
         path = os.path.join(os.getcwd(), self.videoName)
         self.cur.execute('INSERT INTO Videos (name, path) VALUES (?, ?)', (self.videoName, path))
         self.dbConn.commit()
