@@ -59,6 +59,7 @@ class VideoReception(DataBase):
         self.result = None
         self.nFrame = 0
         self.video_id = None
+        self.videoName = None
         # Rangos de la estructura esperada
         data = ">hfhL"
         self.FRAME_NUMBER = slice(struct.calcsize(data[:2]))
@@ -74,17 +75,27 @@ class VideoReception(DataBase):
         self.showMenu()
         self.conn, self.addr = self.s.accept()
         print('Conectado')
-        self.videoName = input('Nombre del video a grabar (Enter para no grabar): ')
-        self.videoName += '.avi'
+        # Get initial data
         size = self.getImgSize()
+        self.checkTraining()
         if self.videoName:
             self.result = cv2.VideoWriter(self.videoName, cv2.VideoWriter_fourcc(*"MJPG"), 20, size)
             super().__init__()
             self.createDB()
             self.saveVideo()
 
+    def checkTraining(self):
+        self.videoName = None
+        train = self.read_struct('>h')
+        print(train)
+        if train:
+            n_len = self.read_struct('>h')
+            v_name = self.read_struct(f'>{n_len}s')
+            self.videoName = v_name.decode() + '.avi'
+            print(self.videoName)
+
     def saveVideo(self):
-        if self.videoName == '.avi':
+        if self.videoName is None or self.videoName == '.avi':
             return
         path = os.path.join(os.getcwd(), self.videoName)
         self.cur.execute('INSERT INTO Videos (name, path) VALUES (?, ?)', (self.videoName, path))
@@ -108,6 +119,13 @@ class VideoReception(DataBase):
                 return False
         return True
 
+    def read_struct(self, structure):
+        msg_size = struct.calcsize(structure)
+        self.read(msg_size)
+        msg = struct.unpack(structure, self.data[:msg_size])[0]
+        self.data = self.data[msg_size:]
+        return msg
+
     def parse_data(self):
         if not self.read(self.payload_size):
             return
@@ -126,7 +144,7 @@ class VideoReception(DataBase):
         return vel, dir, frame_data
 
     def saveData(self, frame, vel, dir):
-        if not self.videoName:
+        if self.videoName is None or self.videoName == '.avi':
             return
         self.result.write(frame)
         self.cur.execute('INSERT INTO Datos (video_id, frame, vel, dir) VALUES (?, ?, ?, ?)', (self.video_id, self.nFrame, vel, dir))
