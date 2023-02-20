@@ -12,10 +12,11 @@ ANG_LIMIT = 70
 
 class Carrito:
 
-    def __init__(self, remote=False, segmentateCam = False):
+    def __init__(self, remote=False, segmentateCam = False, training = 0):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]
         self.camara = Camara(segmentate=segmentateCam)
+        self.training = training
         try:
             self.arduino = Arduino()
         except:
@@ -24,11 +25,17 @@ class Carrito:
         self.remote = remote
         if remote:
             self.connect2Server()
-        self.ang = 20
+        self.ang = 0
         self.vel = 0
         self.img_counter = 0
         self.change = None
         self.stopped = False
+
+    def config(self, remote=False, segmentateCam = False, training = 0):
+        self.training = training
+        self.remote = remote
+        if remote:
+            self.connect2Server()
 
     def move(self, comm,valor):
         if not comm:
@@ -73,8 +80,10 @@ class Carrito:
         self.showControls()
         self.showInfo()
         while True:
-            #com = input('Ingrese comando: ')
-            com,valor=mando.leer_mando()
+            if mando.connected:
+                com,valor=mando.leer_mando()
+            else: # Falta adaptar valor
+                com = input('Ingrese comando: ')
             if com =='q':
                 self.stopped=True
                 self.camara.stop()
@@ -97,7 +106,16 @@ class Carrito:
             with open("ip.txt", 'w') as f:
                 f.write('\n'.join([url, port]))
         self.client_socket.connect((url, int(port)))
+        self.sendInit2Server()
+
+    def sendInit2Server(self):
         self.client_socket.sendall(struct.pack(">hh", *self.camara.getImgSize()))
+        self.client_socket.sendall(struct.pack(">h", self.training))
+        if self.training:
+            name = input('Ingrese nombre de entrenamiento: ')
+            self.client_socket.sendall(struct.pack(">h", len(name) ))
+            self.client_socket.sendall(struct.pack(f">{len(name)}s", name.encode() ))
+            print(struct.pack(f">h{len(name)}s",len(name), name.encode()))
 
     def showInfo(self):
         t = Thread(target=self.show, args=())
@@ -124,7 +142,7 @@ class Carrito:
                 continue
             self.img_counter += 1
             # Transmit data
-            if self.img_counter % 10 != 0:
+            if self.img_counter % 5 != 0:
                continue
             #t_ant1 = time()
             _, image = cv2.imencode('.jpg', frame, self.encode_param)  

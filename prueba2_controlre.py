@@ -80,6 +80,7 @@ class Controller:
     Mode_Btn=128
 
     def __init__(self, debug=False):
+        self.connected = False
         for i in range(20):
             try:
                 self.gamepad = InputDevice(f'/dev/input/event{i}')
@@ -87,10 +88,19 @@ class Controller:
                 if self.gamepad.name == 'Logitech Logitech Dual Action':
                     break
             except:
-                print(f'event{i} not found')        
+                if i == 19:
+                    print('Mando no conectado')
+                    return
         self.debug = debug
         #Muestra la info del gamepad
         print(self.gamepad)
+        self.connected = True
+
+    def obtener_comando(self):
+       opt = None
+       while not opt:
+           opt, val = self.leer_mando()
+       return opt, val
 
 #while True:
     def leer_mando(self):
@@ -157,12 +167,12 @@ class Controller:
                #print ecodes.bytype[absevent.event.type][absevent.event.code], absevent.event.value
                if ecodes.bytype[absevent.event.type][absevent.event.code] == "ABS_Z":
                     if absevent.event.value <= 128:
-                       Vel= round(-1*absevent.event.value*45/128+70)
+                       Vel= round(-1*absevent.event.value*35/128+70)
                        if self.debug:
                            print("Izquierda",Vel)
                        comando='a'
                     elif absevent.event.value > 128:
-                       Vel= round((absevent.event.value-128)*-20/127+25)
+                       Vel= round((absevent.event.value-128)*-35/127+35)
                        if self.debug:
                            print("Derecha",Vel)
                        comando='d'
