@@ -2,6 +2,7 @@ from carrito import Carrito
 from prueba2_controlre import *
 
 def menu(mando, description):
+    print('-'*50)
     if mando.connected:
         print(description)
         opt, _ = mando.obtener_comando()
@@ -11,7 +12,12 @@ def menu(mando, description):
 
 if __name__ == '__main__':
     print('G1 - Carrito')
-    description = '\tTeleoperado -> 1\n\tEntrenamiento -> 2\n\tDetección de líneas -> 3\nIngrese una de las opciones: '
+    description = """Main menu
+      1.  Teleoperado
+      2.  Entrenamiento
+      3.  Detección de líneas 
+      4.  End to end autonomy 
+Ingrese una de las opciones: """
     car = Carrito()
     mando = Controller(debug=True)
     while True:
@@ -28,5 +34,10 @@ if __name__ == '__main__':
         elif option == '3': # Corregir
             car.config(remote=True, segmentateCam=True)
             car.configDeteccion()
+        elif option == '4':
+            # car.config(remote=True)
+            car.autonomo()
+        elif option == 'q':
+            break
         else:
             print('Opción no válida')

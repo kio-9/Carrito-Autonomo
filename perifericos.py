@@ -37,6 +37,10 @@ class Camara:
     def getImgSize(self):
         return self.size
 
+    def get_rtImg(self):
+        _, frame = self.camara.read()
+        return frame
+    
     def start(self):
         t = Thread(target=self.update, args=())
         t.daemon = True

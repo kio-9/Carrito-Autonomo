@@ -5,7 +5,9 @@ import socket
 import struct
 from threading import Thread
 from time import time, sleep
+import time
 from prueba2_controlre import *
+from keras.models import load_model
 
 VEL_LIMIT = 300
 ANG_LIMIT = 70
@@ -172,6 +174,23 @@ class Carrito:
                 sleep(1)
                 break
             self.camara.houghParams[key]=int(command[1:]) if key!=1 else int(command[1:])/100
+
+    def img_preprocess(self, img):
+        p_img = cv2.resize(img, (64, 60))
+        p_img = cv2.cvtColor(p_img, cv2.COLOR_BGR2GRAY)
+        p_img = p_img/255.
+        return p_img.reshape(1, 60, 64, 1)
+
+    def autonomo(self):
+        modelo = load_model('modelo_alvinn.h5')
+        modelo.summary()
+        for i in range(30):
+            t = time.time()
+            img = self.camara.get_rtImg()
+            img = self.img_preprocess(img)
+            prediccion = modelo.predict(img)
+            print(prediccion)
+            print(f'Tiempo transcurrido: {time.time()-t}')
 
 if __name__ == '__main__':
     opt = input('1->Local, 2->remoto : ')
