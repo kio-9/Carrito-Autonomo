@@ -12,7 +12,7 @@ from time import time
 import sqlite3
 
 HOST=''
-PORT=8485
+PORT=8490
 
 class DataBase:
     dbName = 'datos.sqlite'
@@ -84,7 +84,7 @@ class VideoReception(DataBase):
             self.saveVideo()
 
     def saveVideo(self):
-        if not self.videoName:
+        if self.videoName == '.avi':
             return
         path = os.path.join(os.getcwd(), self.videoName)
         self.cur.execute('INSERT INTO Videos (name, path) VALUES (?, ?)', (self.videoName, path))
@@ -158,4 +158,8 @@ while True:
         cv2.waitKey(1)
     receptor.closeVideo()
     cv2.destroyAllWindows()
+    opt = input('Seguir conectado? (Y/n): ')
+    if opt.lower() != 'y':
+        print('Finalizando servidor...')
+        break
     print('Esperando nueva conexión...')
