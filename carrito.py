@@ -60,10 +60,50 @@ class Carrito:
             self.connect2Server()
 
     def TecladoLogic(self,comm,valor):
+        if self.vel == 0 and comm in 'xw':
+            self.vel = 3 if comm == 'w' else -3
+        if comm == 'w' and self.vel <= VEL_LIMIT:
+            #Tecla avanzar, incrementamos la velocidad en 0.05
+            self.vel = self.vel + 0.05
+            self.change = 'v'
+        elif comm == 'a' and self.ang <= ANG_LIMIT:
+            #Tecla hacia la derecha, incrementamos el ángulo en 5 grados
+            self.ang = self.ang + 5
+            self.change = 'a'
+        elif comm == 's':
+            #Tecla para detener por completo
+            self.vel = 0
+            self.change = 'v'
+            self.ang = 30
+        elif comm == 'd' and self.ang >= ANG_LIMIT_INF:
+            #Tecla hacia la izquierda, decremento en 5 grados 
+            self.ang = self.ang - 5
+            self.change = 'a'
+        elif comm == 'x' and self.vel >= -VEL_LIMIT:
+            self.vel = self.vel-0.05
+            self.change = 'v'
+
+    def MandoLogic(self,comm,valor):
         if comm == 'd' and valor < ANG_LIMIT_INF:
             valor = ANG_LIMIT_INF
-
-
+        if self.vel == 0 and comm in 'xw':
+            self.vel = 3 if comm == 'w' else -3
+        if comm == 'w' and valor <= VEL_LIMIT:
+            self.vel = valor 
+            self.change = 'v'
+        elif comm == 'a' and valor <= ANG_LIMIT_SUP:
+            self.ang = valor
+            self.change = 'a'
+        elif comm == 's':
+            self.vel = 0
+            self.change = 'v'
+            self.ang = 30
+        elif comm == 'd' and valor >= ANG_LIMIT_INF:
+            self.ang = valor 
+            self.change = 'a'
+        elif comm == 'x' and valor >= -VEL_LIMIT:
+            self.vel =valor
+            self.change = 'v'
 
     def move(self, comm,valor):
         if not comm:
@@ -74,7 +114,28 @@ class Carrito:
         else
             MandoLogic()
         
-        
+        if self.vel == 0 and comm in 'xw':
+            self.vel = 3 if comm == 'w' else -3
+        if comm == 'w' and self.vel <= VEL_LIMIT:
+            #Tecla avanzar, incrementamos la velocidad en 0.05
+            self.vel = self.vel + 0.05
+            self.change = 'v'
+        elif comm == 'a' and self.ang <= ANG_LIMIT:
+            #Tecla hacia la derecha, incrementamos el ángulo en 5 grados
+            self.ang = self.ang + 5
+            self.change = 'a'
+        elif comm == 's':
+            #Tecla para detener por completo
+            self.vel = 0
+            self.change = 'v'
+            self.ang = 30
+        elif comm == 'd' and self.ang >= ANG_LIMIT_INF:
+            #Tecla hacia la izquierda, decremento en 5 grados 
+            self.ang = self.ang - 5
+            self.change = 'a'
+        elif comm == 'x' and self.vel >= -VEL_LIMIT:
+            self.vel = self.vel-0.05
+            self.change = 'v'
         
         # Saturadores
         if comm == 'd' and valor < ANG_LIMIT_INF:
@@ -96,6 +157,7 @@ class Carrito:
         elif comm == 'x' and (valor >= -VEL_LIMIT or (valor ==999 and self.vel >= -VEL_LIMIT)):
             self.vel =valor if valor != 999 else self.vel-0.05
             self.change = 'v'
+    
 
     def showControls(self):
         ctrls = "Controles:\n\tw: avanzar\n\ta: izquierda\n\ts: stop\n\td: derecha\n\tx: retroceder"
@@ -230,7 +292,7 @@ class Carrito:
                 break
         return max_prob_pos
     
-   def GiveAngleAuto(self, posicion_prob):
+    def GiveAngleAuto(self, posicion_prob):
         if posicion_prob == 0: 
             self.ang = ANG_LIMIT_INF_aut
             self.vel = 3.3
