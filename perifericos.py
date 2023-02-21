@@ -201,14 +201,59 @@ class Mando:
             if self.debug:
                 print(boton)
             return self.parseButton(boton)
-        elif event.type == ecodes.
+        elif event.type == ecodes.EV_ABS:
+            absevent = categorize(event)
+            return self.parseJoystick(absevent)
 
+    def parseButton(self, boton):
+        if boton = 'x_Btn':
+            com = '4'
+        elif boton = 'cuadrado_Btn':
+            com = '1'
+        elif boton = 'triangulo_Btn':
+            com = '2'
+        elif boton = 'circulo_Btn':
+            com = '3'
+        elif boton = 'l1_Btn':
+            com = 'q'
+        elif boton = 'r1_Btn':
+            print('nada')
+            com = '1'
+        elif boton = 'back_Btn':
+            print('nada')
+            com = '1'
+        elif boton = 'start_Btn':
+            print('nada')
+            com = '1'
+        else:
+            print('Botón no mapeado')
+        return com, None
 
-
-
-       
-       
-
+    def parseJoystick(self, absevent):
+        valor = absevent.event.value 
+        if ecode.bytype[absevent.event.type][absevent.event.code] == 'ABS_Z':
+            if valor <= 128:
+                ang = round(-valor*35/128+70)
+                d = ('Izq', 'a')
+            else:
+                ang = round(-(valor-128)*35/127+35)
+                d = ('Der', 'd')
+            if self.debug:
+                print(f'{d[0]}: {ang}')
+            return d[1], ang
+        elif ecode.bytype[absevent.event.type][absevent.event.code] == 'ABS_Y':
+            if valor <= 122:
+                vel = round(-valor*3.6/122+6.6, 2)
+                d = ('Avanza', 'w')
+            elif valor >= 132:
+                vel = round(-3+(-valor+132)*3.6/123, 2)
+                d = ('Retrocede', 'x')
+            if self.debug:
+                print(f'{d[0]}: {vel}')
+            return d[1], vel
+        else:
+            print('boton no mapeado')
+            return None, None
 
 
 if __name__ == '__main__':
