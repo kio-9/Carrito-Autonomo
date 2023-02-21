@@ -13,6 +13,13 @@ VEL_LIMIT = 300
 ANG_LIMIT_SUP = 54
 ANG_LIMIT_INF = 15
 
+#Autonomo
+ANG_LIMIT_SUP_aut = 50 # IZQUIERDA
+ANG_SUP = 34 # LEVE IZQUIERDA (LIMITE SUPERIOR - RECTO)/2
+ANG_RECTO = 30
+ANG_INF = 25 # LEVE DERECHA (LIMITE INFERIOR - RECTO)/2
+ANG_LIMIT_INF_aut = 18 # DERECHA 
+
 class Carrito:
 
     def __init__(self, remote=False, segmentateCam = False, training = 0):
@@ -53,82 +60,42 @@ class Carrito:
             self.connect2Server()
 
     def TecladoLogic(self,comm,valor):
-        if self.vel == 0 and comm in 'xw':
-            self.vel = 3 if comm == 'w' else -3
-        if comm == 'w' and self.vel <= VEL_LIMIT:
-            #Tecla avanzar, incrementamos la velocidad en 0.05
-            self.vel = self.vel + 0.05
-            self.change = 'v'
-        elif comm == 'a' and self.ang <= ANG_LIMIT:
-            #Tecla hacia la derecha, incrementamos el ángulo en 5 grados
-            self.ang = self.ang + 5
-            self.change = 'a'
-        elif comm == 's':
-            #Tecla para detener por completo
-            self.vel = 0
-            self.change = 'v'
-            self.ang = 30
-        elif comm == 'd' and self.ang >= ANG_LIMIT_INF:
-            #Tecla hacia la izquierda, decremento en 5 grados 
-            self.ang = self.ang - 5
-            self.change = 'a'
-        elif comm == 'x' and self.vel >= -VEL_LIMIT:
-            self.vel = self.vel-0.05
-            self.change = 'v'
-        
-    def MandoLogic(self,comm,valor):
         if comm == 'd' and valor < ANG_LIMIT_INF:
             valor = ANG_LIMIT_INF
-        if self.vel == 0 and comm in 'xw':
-            self.vel = 3 if comm == 'w' else -3
-        if comm == 'w' and valor <= VEL_LIMIT:
-            self.vel = valor 
-            self.change = 'v'
-        elif comm == 'a' and valor <= ANG_LIMIT_SUP:
-            self.ang = valor
-            self.change = 'a'
-        elif comm == 's':
-            self.vel = 0
-            self.change = 'v'
-            self.ang = 30
-        elif comm == 'd' and valor >= ANG_LIMIT_INF:
-            self.ang = valor 
-            self.change = 'a'
-        elif comm == 'x' and valor >= -VEL_LIMIT:
-            self.vel =valor
-            self.change = 'v'
-        
+
+
+
     def move(self, comm,valor):
         if not comm:
             return
         ## Modificado - Verificamos que el mando está conectado
         if (mando.connected):
-            self.TecladoLogic(comm,valor)
+            TecladoLogic(comm,valor)
         else
-            self.MandoLogic(comm, valor)       
+            MandoLogic()
+        
+        
         
         # Saturadores
-        
-        #if comm == 'd' and valor < ANG_LIMIT_INF:
-        #    valor = ANG_LIMIT_INF
-        #if self.vel == 0 and valor == 999 and comm in 'xw':
-        #    self.vel = 3 if comm == 'w' else -3
-        #if comm == 'w' and (valor <= VEL_LIMIT or (valor == 999 and self.vel <= VEL_LIMIT)):
-        #    self.vel = valor if valor != 999 else self.vel+0.05
-        #    self.change = 'v'
-        #elif comm == 'a' and (valor <= ANG_LIMIT_SUP or (valor == 999 and self.ang <= ANG_LIMIT)):
-        #    self.ang = valor if valor != 999 else self.ang+5
-        #    self.change = 'a'
-        #elif comm == 's':
-        #    self.vel = 0
-        #    self.change = 'v'
-        #    self.ang = 30
-        #elif comm == 'd' and (valor >= ANG_LIMIT_INF or (valor == 999 and self.ang >= ANG_LIMIT_INF )):
-        #    self.ang = valor if valor != 999 else self.ang-5
-        #    self.change = 'a'
-        #elif comm == 'x' and (valor >= -VEL_LIMIT or (valor ==999 and self.vel >= -VEL_LIMIT)):
-        #    self.vel =valor if valor != 999 else self.vel-0.05
-        #    self.change = 'v'
+        if comm == 'd' and valor < ANG_LIMIT_INF:
+            valor = ANG_LIMIT_INF
+        if self.vel == 0 and valor == 999 and comm in 'xw':
+            self.vel = 3 if comm == 'w' else -3
+        if comm == 'w' and (valor <= VEL_LIMIT or (valor == 999 and self.vel <= VEL_LIMIT)):
+            self.vel = valor if valor != 999 else self.vel+0.05
+            self.change = 'v'
+        elif comm == 'a' and (valor <= ANG_LIMIT_SUP or (valor == 999 and self.ang <= ANG_LIMIT)):
+            self.ang = valor if valor != 999 else self.ang+5
+            self.change = 'a'
+        elif comm == 's':
+            self.vel = 0
+            self.change = 'v'
+        elif comm == 'd' and (valor >= ANG_LIMIT_INF or (valor == 999 and self.ang >= ANG_LIMIT_INF )):
+            self.ang = valor if valor != 999 else self.ang-5
+            self.change = 'a'
+        elif comm == 'x' and (valor >= -VEL_LIMIT or (valor ==999 and self.vel >= -VEL_LIMIT)):
+            self.vel =valor if valor != 999 else self.vel-0.05
+            self.change = 'v'
 
     def showControls(self):
         ctrls = "Controles:\n\tw: avanzar\n\ta: izquierda\n\ts: stop\n\td: derecha\n\tx: retroceder"
@@ -253,17 +220,66 @@ class Carrito:
         p_img = cv2.cvtColor(p_img, cv2.COLOR_BGR2GRAY)
         p_img = p_img/255.
         return p_img.reshape(1, 60, 64, 1)
-
+   
+    def Ang_Select(prediccion): 
+        max_prob = prediccion.max()
+        max_prob_pos = None
+        for pos,i in enumerate(prediccion):
+            if max_prob == i:
+                max_prob_pos = pos
+                break
+        return max_prob_pos
+    
+   def GiveAngleAuto(self, posicion_prob):
+        if posicion_prob == 0: 
+            self.ang = ANG_LIMIT_INF_aut
+            self.vel = 3.3
+            self.change = 'a'
+            print("Movimiento brusco a la derecha")
+        elif posicion_prob == 1:
+            self.ang = ANG_INF
+            self.vel = 4.2
+            self.change = 'a'
+            print("Movimiento a la derecha")
+        elif posicion_prob == 2:
+            self.ang = ANG_RECTO
+            self.vel = 5
+            print("Movimiento defrente")
+        elif posicion_prob == 3:
+            self.ang = ANG_SUP
+            self.vel = 4.2
+            self.change = 'a'
+            print("Movimiento a la izquierda")
+        else:
+            self.ang = ANG_LIMIT_SUP_aut
+            self.vel = 3.3
+            self.change = 'a'
+            print("Movimiento brusco a la izquierda")
+    
+    def Mode_Autonomo(self):
+        t = Thread(target=self.autonomo, args=())
+        t.daemon = True
+        t.start()
+        return self
+        
     def autonomo(self):
         modelo = load_model('modelo_alvinn.h5')
         modelo.summary()
-        for i in range(30):
+        while True:
             t = time.time()
             img = self.camara.get_rtImg()
             img = self.img_preprocess(img)
             prediccion = modelo.predict(img)
             print(prediccion)
             print(f'Tiempo transcurrido: {time.time()-t}')
+            pos_prediccion = Ang_Select(prediccion[0])
+            self.GiveAngleAuto(pos_prediccion)
+            self.encodeArduino()
+            if self.stopped:
+                self.camara.stop()
+                print('Saliendo del modo autonomo')
+                sleep(1)
+                return
 
 if __name__ == '__main__':
     opt = input('1->Local, 2->remoto : ')
