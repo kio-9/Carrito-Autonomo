@@ -2,7 +2,7 @@
 from evdev import InputDevice, categorize, ecodes
 
 #Creamos el objecto gamepad
-gamepad = InputDevice('/dev/input/event5')
+gamepad = InputDevice('/dev/input/event2')
 
 #Muestra la info del gamepad
 print(gamepad)

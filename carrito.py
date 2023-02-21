@@ -10,28 +10,41 @@ from prueba2_controlre import *
 from keras.models import load_model
 
 VEL_LIMIT = 300
-ANG_LIMIT = 70
+ANG_LIMIT_SUP = 54
+ANG_LIMIT_INF = 15
 
 class Carrito:
 
     def __init__(self, remote=False, segmentateCam = False, training = 0):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]
-        self.camara = Camara(segmentate=segmentateCam)
+        try:
+            self.camara = Camara(segmentate=segmentateCam)
+        except ConnectionError:
+            self.camara = None
         self.training = training
         try:
             self.arduino = Arduino()
         except:
-            print("arduino no conectado")
             self.arduino = None
+            print('Puerto de arduino no encontrado')
         self.remote = remote
         if remote:
             self.connect2Server()
-        self.ang = 0
+        self.ang = 30
         self.vel = 0
         self.img_counter = 0
         self.change = None
         self.stopped = False
+        print(self)
+
+    def __str__(self):
+        msg = '_'*50
+        msg += '\nEstado del Carrito:\n'
+        msg += "Cámara no conectada\n" if not self.camara else "Cámara conectada\n"
+        msg += "Arduino no conectado\n" if not self.arduino else "Arduino conectado\n"
+        msg += '_'*50
+        return msg
 
     def config(self, remote=False, segmentateCam = False, training = 0):
         self.training = training
@@ -39,23 +52,42 @@ class Carrito:
         if remote:
             self.connect2Server()
 
+    def TecladoLogic(self,comm,valor):
+        if comm == 'd' and valor < ANG_LIMIT_INF:
+            valor = ANG_LIMIT_INF
+
+
+
     def move(self, comm,valor):
         if not comm:
             return
-        if comm == 'w' and valor < VEL_LIMIT:
-            self.vel = valor
+        ## Modificado - Verificamos que el mando está conectado
+        if (mando.connected):
+            TecladoLogic(comm,valor)
+        else
+            MandoLogic()
+        
+        
+        
+        # Saturadores
+        if comm == 'd' and valor < ANG_LIMIT_INF:
+            valor = ANG_LIMIT_INF
+        if self.vel == 0 and valor == 999 and comm in 'xw':
+            self.vel = 3 if comm == 'w' else -3
+        if comm == 'w' and (valor <= VEL_LIMIT or (valor == 999 and self.vel <= VEL_LIMIT)):
+            self.vel = valor if valor != 999 else self.vel+0.05
             self.change = 'v'
-        elif comm == 'a' and valor < ANG_LIMIT:
-            self.ang = valor
+        elif comm == 'a' and (valor <= ANG_LIMIT_SUP or (valor == 999 and self.ang <= ANG_LIMIT)):
+            self.ang = valor if valor != 999 else self.ang+5
             self.change = 'a'
         elif comm == 's':
             self.vel = 0
             self.change = 'v'
-        elif comm == 'd' and valor > 0:
-            self.ang = valor
+        elif comm == 'd' and (valor >= ANG_LIMIT_INF or (valor == 999 and self.ang >= ANG_LIMIT_INF )):
+            self.ang = valor if valor != 999 else self.ang-5
             self.change = 'a'
-        elif comm == 'x' and valor > -VEL_LIMIT:
-            self.vel =valor
+        elif comm == 'x' and (valor >= -VEL_LIMIT or (valor ==999 and self.vel >= -VEL_LIMIT)):
+            self.vel =valor if valor != 999 else self.vel-0.05
             self.change = 'v'
 
     def showControls(self):
@@ -86,6 +118,7 @@ class Carrito:
                 com,valor=mando.leer_mando()
             else: # Falta adaptar valor
                 com = input('Ingrese comando: ')
+                valor = 999
             if com =='q':
                 self.stopped=True
                 self.camara.stop()

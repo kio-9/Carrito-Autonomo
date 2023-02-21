@@ -21,6 +21,8 @@ class Camara:
         self.Q = Queue(maxsize=queueSize)
         self.Q_show = Queue(maxsize=queueSize)
         self.houghParams = [6,0.15,258]
+        if self.camara is None or not self.camara.isOpened():
+            raise ConnectionError
 
     def conectarCamara(self):
         for i in range(2):
@@ -129,7 +131,7 @@ class Arduino:
         if self.__class__.ser is None:
             self.__class__.ser = serial.Serial('/dev/ttyUSB0', baudrate=115200)
         self.ser = self.__class__.ser
-        # self.sendCommand('S20')
+
 
     def conectarArduino(self):
         for i in range(2):
@@ -147,6 +149,67 @@ class Arduino:
         command = command+"\n"
         self.ser.write(command.encode('utf_8'))
         print(self.ser.readline().decode())
+
+class Mando:
+
+    def __init__(self):
+        # Libraries 
+        import asyncio
+        import time
+        from evdev import InputDevice, categorize, ecodes
+        import numpy as np
+        # Set buttons
+        with open('botones.txt', 'r') as f:
+            self.botones = {l.split(',')[1]:l.split(',')[0] for l in f}
+
+        # Connect to controller
+        self.connected = False
+        for i in range(20):
+            try:
+                self.gamepad = InputDevice(f'/dev/input/event{i}')
+                print(self.gamepad.name)
+                if 'Gamepad' in self.gamepad.name:
+                    break
+            except:
+                if i == 19:
+                    print('Mando no conectado')
+                    return
+        self.debug = debug
+        self.connected = True
+        
+    def obtener_comando(self):
+        com = None
+        while not com:
+            opt, val = self.leer_mando()
+        return opt, val
+
+    def leer_mando(self):
+        comando = ''
+        vel = 0
+        event = None
+        t = time.time()
+        # Read event
+        while not event:
+            event = self.gamepad.read_one()
+            if time.time()-t > 2:
+                return None, -999
+        # Parse event
+        if event.type == ecodes.EV_KEY:
+            if event.value == 0: # Button released
+                return None, None
+            boton = self.botones.get(event.value, 'no c')
+            if self.debug:
+                print(boton)
+            return self.parseButton(boton)
+        elif event.type == ecodes.
+
+
+
+
+       
+       
+
+
 
 if __name__ == '__main__':
     opt = input('Opciones:\n\t1->camara+motores\n\t2->detector de lineas\nIngrese una opcion: ')

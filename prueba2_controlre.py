@@ -69,15 +69,14 @@ for event in dev.read_loop():
 '''
 class Controller:
     #Como las variables de python no admiten numeros usamos letras
-    xBtn = 289
-    cuadrado_Btn = 288
-    triangulo_Btn = 291
-    circulo_Btn = 290
-    l1_Btn=293
-    r1_Btn=292
-    back_Btn=296
-    Start_Btn=297
-    Mode_Btn=128
+    xBtn = 304
+    cuadrado_Btn = 307
+    triangulo_Btn = 308
+    circulo_Btn = 305
+    l1_Btn=310
+    r1_Btn=311
+    back_Btn=314
+    Start_Btn=315
 
     def __init__(self, debug=False):
         self.connected = False
@@ -85,7 +84,7 @@ class Controller:
             try:
                 self.gamepad = InputDevice(f'/dev/input/event{i}')
                 print(self.gamepad.name)
-                if self.gamepad.name == 'Logitech Logitech Dual Action':
+                if 'Gamepad' in self.gamepad.name:
                     break
             except:
                 if i == 19:
