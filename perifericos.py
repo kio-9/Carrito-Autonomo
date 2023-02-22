@@ -3,7 +3,10 @@ import numpy as np
 import serial
 from threading import Thread
 from queue import Queue
-from time import time, sleep
+import time
+import asyncio
+from evdev import InputDevice, categorize, ecodes
+import numpy as np
 
 class Camara:
     cap = None
@@ -150,18 +153,12 @@ class Arduino:
         self.ser.write(command.encode('utf_8'))
         print(self.ser.readline().decode())
 
-class Mando:
+class Controller:
 
-    def __init__(self):
-        # Libraries 
-        import asyncio
-        import time
-        from evdev import InputDevice, categorize, ecodes
-        import numpy as np
+    def __init__(self, debug):     
         # Set buttons
         with open('botones.txt', 'r') as f:
-            self.botones = {l.split(',')[1]:l.split(',')[0] for l in f}
-
+            self.botones = {l.split(',')[1].rstrip():l.split(',')[0] for l in f}
         # Connect to controller
         self.connected = False
         for i in range(20):
@@ -174,14 +171,18 @@ class Mando:
                 if i == 19:
                     print('Mando no conectado')
                     return
-        self.debug = debug
         self.connected = True
+        # Controller options
+        self.debug = debug
+        self.config = 'analog'
+        self.ANGLES = [0, 15, 35, 50, 70]
+        self.index = 2
         
     def obtener_comando(self):
         com = None
         while not com:
-            opt, val = self.leer_mando()
-        return opt, val
+            com, val = self.leer_mando()
+        return com, val
 
     def leer_mando(self):
         comando = ''
@@ -192,96 +193,101 @@ class Mando:
         while not event:
             event = self.gamepad.read_one()
             if time.time()-t > 2:
-                return None, -999
+                return None, None
         # Parse event
-        if event.type == ecodes.EV_KEY:
+        if event.type == ecodes.EV_KEY: # Buttons
             if event.value == 0: # Button released
                 return None, None
-            boton = self.botones.get(event.value, 'no c')
-            if self.debug:
-                print(boton)
-            return self.parseButton(boton)
-        elif event.type == ecodes.EV_ABS:
+            boton = self.botones.get(str(event.code), 'no c') 
+            return self.__parseButton(boton)
+        elif event.type == ecodes.EV_ABS: # Directional sticks
             absevent = categorize(event)
-            return self.parseJoystick(absevent)
+            return self.__parseJoystick(absevent)
+        else:
+            return None, None
 
-    def parseButton(self, boton):
-        if boton = 'x_Btn':
+    def __parseButton(self, boton):
+        com = None
+        if boton == 'x_Btn':
             com = '4'
-        elif boton = 'cuadrado_Btn':
+        elif boton == 'cuadrado_Btn':
             com = '1'
-        elif boton = 'triangulo_Btn':
+        elif boton == 'triangulo_Btn':
             com = '2'
-        elif boton = 'circulo_Btn':
+        elif boton == 'circulo_Btn':
             com = '3'
-        elif boton = 'l1_Btn':
+        elif boton == 'l1_Btn':
             com = 'q'
-        elif boton = 'r1_Btn':
-            print('nada')
+        elif boton == 'r1_Btn':
             com = '1'
-        elif boton = 'back_Btn':
-            print('nada')
-            com = '1'
-        elif boton = 'start_Btn':
-            print('nada')
+        elif boton == 'back_Btn': 
+            com = None
+            self.index = 2
+            self.config = 'incremental' if self.config=='analog' else 'analog'
+            print(f'Configuración cambiada a {self.config}')
+        elif boton == 'start_Btn':
             com = '1'
         else:
-            print('Botón no mapeado')
+            print('Botón no mapeado') 
+        if self.debug:
+            print(f'{boton}: {com}')
         return com, None
 
-    def parseJoystick(self, absevent):
+    def __parseJoystick(self, absevent):
         valor = absevent.event.value 
-        if ecode.bytype[absevent.event.type][absevent.event.code] == 'ABS_Z':
-            if valor <= 128:
-                ang = round(-valor*35/128+70)
-                d = ('Izq', 'a')
-            else:
-                ang = round(-(valor-128)*35/127+35)
-                d = ('Der', 'd')
-            if self.debug:
-                print(f'{d[0]}: {ang}')
-            return d[1], ang
-        elif ecode.bytype[absevent.event.type][absevent.event.code] == 'ABS_Y':
-            if valor <= 122:
-                vel = round(-valor*3.6/122+6.6, 2)
-                d = ('Avanza', 'w')
-            elif valor >= 132:
-                vel = round(-3+(-valor+132)*3.6/123, 2)
-                d = ('Retrocede', 'x')
-            if self.debug:
-                print(f'{d[0]}: {vel}')
-            return d[1], vel
+        evento = ecodes.bytype[absevent.event.type][absevent.event.code] 
+        if evento == 'ABS_Z' and self.config == 'analog':
+            return self.__angMapping(valor)
+        elif evento == 'ABS_RZ' and self.config == 'incremental':
+            return self.__velMapping(valor)
+        elif evento == 'ABS_Y' and self.config == 'analog':
+            return self.__velMapping(valor)
+        elif evento == 'ABS_HAT0X' and self.config == 'incremental':
+            return self.__angIncremental(valor)
         else:
-            print('boton no mapeado')
+            print('Comando no mapeado')
             return None, None
+
+    def __angIncremental(self, valor):
+        if valor == 0 or self.index+valor not in range(len(self.ANGLES)):
+            return None, None
+        self.index += valor
+        d = 'a' if valor<0 else 'd'
+        if self.debug:
+            print(f'{d}: {self.ANGLES[self.index]}')
+        return d, self.ANGLES[self.index]
+
+    def __angMapping(self, valor):
+        if valor <= 128:
+            ang = round(-valor*35/128+70)
+            d = ('Izq', 'a')
+        else:
+            ang = round(-(valor-128)*35/127+35)
+            d = ('Der', 'd')
+        if self.debug:
+            print(f'{d[0]}: {ang}')
+        return d[1], ang
+
+    def __velMapping(self, valor):
+        if valor <= 122:
+            vel = round(-valor*3.6/122+6.6, 2)
+            d = ('Avanza', 'w')
+        elif valor >= 132:
+            vel = round(-3+(-valor+132)*3.6/123, 2)
+            d = ('Retrocede', 'x')
+        else:
+            vel = 0
+            d = ('Nada', 'w')
+        if self.debug:
+            print(f'{d[0]}: {vel}')
+        return d[1], vel
+
+    def test(self):
+        c,v =self.obtener_comando()
+        print(f'Comando a enviar: {c}, {v}')
 
 
 if __name__ == '__main__':
-    opt = input('Opciones:\n\t1->camara+motores\n\t2->detector de lineas\nIngrese una opcion: ')
-    if opt=='1':
-        ard = Arduino()
-        cam = Camara(remote=True).start().showFrames()
-        while True:
-            comando = input('Ingrese comando: ')
-            print(f'Comando ingresado: {comando}')
-            ard.sendCommand(comando)
-            if comando == 'q':
-                print('Saliendo...')
-                cam.stop()
-                sleep(1)
-                break
-    else:
-        opt = input('1->Local, 2->remoto : ')
-        cam = Camara(remote=True if opt=='2' else False).start().detectLines()
-        while True:
-            command = input('Params: ')
-            if command == 'i':
-                print(cam.houghParams)
-                continue
-            try:
-                key = int(command[0])
-            except:
-                cam.stop()
-                sleep(1)
-                break
-            cam.houghParams[key]=int(command[1:]) if key!=1 else int(command[1:])/100
+    mando = Controller(debug=True)
+    while True:
+        mando.test()

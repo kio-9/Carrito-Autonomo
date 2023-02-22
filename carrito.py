@@ -1,4 +1,4 @@
-from perifericos import Camara, Arduino
+from perifericos import Camara, Arduino, Controller
 import cv2
 import pickle
 import socket
@@ -6,10 +6,9 @@ import struct
 from threading import Thread
 from time import time, sleep
 import time
-from prueba2_controlre import *
 from keras.models import load_model
 
-VEL_LIMIT = 300
+VEL_LIMIT = 6.6
 ANG_LIMIT_SUP = 54
 ANG_LIMIT_INF = 15
 
@@ -25,6 +24,7 @@ class Carrito:
     def __init__(self, remote=False, segmentateCam = False, training = 0):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]
+        self.mando = Controller(debug=True)
         try:
             self.camara = Camara(segmentate=segmentateCam)
         except ConnectionError:
@@ -35,8 +35,9 @@ class Carrito:
         except:
             self.arduino = None
             print('Puerto de arduino no encontrado')
-        self.remote = remote
-        if remote:
+        print(self.camara)
+        self.remote = remote if self.camara is not None else False
+        if self.remote:
             self.connect2Server()
         self.ang = 30
         self.vel = 0
@@ -46,27 +47,32 @@ class Carrito:
         print(self)
 
     def __str__(self):
-        msg = '_'*50
+        msg = '_'*100
         msg += '\nEstado del Carrito:\n'
+        msg += "Mando no conectado, control por teclado activado\n" if not self.mando.connected else "Mando conectado\n"
         msg += "Cámara no conectada\n" if not self.camara else "Cámara conectada\n"
         msg += "Arduino no conectado\n" if not self.arduino else "Arduino conectado\n"
-        msg += '_'*50
+        msg += '_'*100
         return msg
 
     def config(self, remote=False, segmentateCam = False, training = 0):
         self.training = training
-        self.remote = remote
-        if remote:
-            self.connect2Server()
+        if not remote:
+            return
+        self.remote = remote if self.camara is not None else False
+        if not self.remote:
+            print('No es posible conectarse al servidor sin cámara')
+            return
+        self.connect2Server()
 
-    def TecladoLogic(self,comm,valor):
+    def TecladoLogic(self,comm):
         if self.vel == 0 and comm in 'xw':
             self.vel = 3 if comm == 'w' else -3
         if comm == 'w' and self.vel <= VEL_LIMIT:
             #Tecla avanzar, incrementamos la velocidad en 0.05
             self.vel = self.vel + 0.05
             self.change = 'v'
-        elif comm == 'a' and self.ang <= ANG_LIMIT:
+        elif comm == 'a' and self.ang <= ANG_LIMIT_SUP:
             #Tecla hacia la derecha, incrementamos el ángulo en 5 grados
             self.ang = self.ang + 5
             self.change = 'a'
@@ -84,83 +90,39 @@ class Carrito:
             self.change = 'v'
 
     def MandoLogic(self,comm,valor):
+        # Saturadores
         if comm == 'd' and valor < ANG_LIMIT_INF:
             valor = ANG_LIMIT_INF
-        if self.vel == 0 and comm in 'xw':
-            self.vel = 3 if comm == 'w' else -3
-        if comm == 'w' and valor <= VEL_LIMIT:
+        if comm == 'a' and valor > ANG_LIMIT_SUP:
+            valor = ANG_LIMIT_SUP
+        # Guardar valores
+        if comm in 'wx':
             self.vel = valor 
             self.change = 'v'
-        elif comm == 'a' and valor <= ANG_LIMIT_SUP:
+        elif comm in 'da':
             self.ang = valor
             self.change = 'a'
         elif comm == 's':
             self.vel = 0
             self.change = 'v'
-            self.ang = 30
-        elif comm == 'd' and valor >= ANG_LIMIT_INF:
-            self.ang = valor 
-            self.change = 'a'
-        elif comm == 'x' and valor >= -VEL_LIMIT:
-            self.vel =valor
-            self.change = 'v'
+        else:
+            print('Comando no válido')
 
-    def move(self, comm,valor):
-        if not comm:
-            return
+    def move(self, comm, valor):
         ## Modificado - Verificamos que el mando está conectado
-        if (mando.connected):
-            TecladoLogic(comm,valor)
-        else
-            MandoLogic()
+        if not self.mando.connected:
+            self.TecladoLogic(comm,valor)
+        else:
+            self.MandoLogic(comm,valor)
         
-        if self.vel == 0 and comm in 'xw':
-            self.vel = 3 if comm == 'w' else -3
-        if comm == 'w' and self.vel <= VEL_LIMIT:
-            #Tecla avanzar, incrementamos la velocidad en 0.05
-            self.vel = self.vel + 0.05
-            self.change = 'v'
-        elif comm == 'a' and self.ang <= ANG_LIMIT:
-            #Tecla hacia la derecha, incrementamos el ángulo en 5 grados
-            self.ang = self.ang + 5
-            self.change = 'a'
-        elif comm == 's':
-            #Tecla para detener por completo
-            self.vel = 0
-            self.change = 'v'
-            self.ang = 30
-        elif comm == 'd' and self.ang >= ANG_LIMIT_INF:
-            #Tecla hacia la izquierda, decremento en 5 grados 
-            self.ang = self.ang - 5
-            self.change = 'a'
-        elif comm == 'x' and self.vel >= -VEL_LIMIT:
-            self.vel = self.vel-0.05
-            self.change = 'v'
-        
-        # Saturadores
-        if comm == 'd' and valor < ANG_LIMIT_INF:
-            valor = ANG_LIMIT_INF
-        if self.vel == 0 and valor == 999 and comm in 'xw':
-            self.vel = 3 if comm == 'w' else -3
-        if comm == 'w' and (valor <= VEL_LIMIT or (valor == 999 and self.vel <= VEL_LIMIT)):
-            self.vel = valor if valor != 999 else self.vel+0.05
-            self.change = 'v'
-        elif comm == 'a' and (valor <= ANG_LIMIT_SUP or (valor == 999 and self.ang <= ANG_LIMIT)):
-            self.ang = valor if valor != 999 else self.ang+5
-            self.change = 'a'
-        elif comm == 's':
-            self.vel = 0
-            self.change = 'v'
-        elif comm == 'd' and (valor >= ANG_LIMIT_INF or (valor == 999 and self.ang >= ANG_LIMIT_INF )):
-            self.ang = valor if valor != 999 else self.ang-5
-            self.change = 'a'
-        elif comm == 'x' and (valor >= -VEL_LIMIT or (valor ==999 and self.vel >= -VEL_LIMIT)):
-            self.vel =valor if valor != 999 else self.vel-0.05
-            self.change = 'v'
-    
-
     def showControls(self):
-        ctrls = "Controles:\n\tw: avanzar\n\ta: izquierda\n\ts: stop\n\td: derecha\n\tx: retroceder"
+        print('Controles')
+        if not self.mando.connected:
+            ctrls = "\tw: avanzar\n\ta: izquierda\n\ts: stop\n\td: derecha\n\tx: retroceder"
+        elif self.mando.config == 'analog':
+            ctrls = '\tJoystick izq: avanzar - retroceder\n\tJoystick der: derecha-izquierda'
+        else:
+            ctrls = '\tJoystick der: avanzar - retroceder\n\tCruceta: derecha-izquierda'
         print(ctrls)
 
     def encodeArduino(self):
@@ -174,28 +136,32 @@ class Carrito:
             sign = '+' if self.vel >= 0 else ''
             comm = f'G{sign}{self.vel:.2f}'
         print(comm)
-        if self.arduino is not None:
-            self.arduino.sendCommand(comm)
+        if self.arduino is None:
+            print('Arduino no conectado: no se pueden activar motores')
+            return
+        self.arduino.sendCommand(comm)
         self.change = None
 
     def teleop(self):
-        mando = Controller(debug=True)
         self.showControls()
         self.showInfo()
         while True:
-            if mando.connected:
-                com,valor=mando.leer_mando()
-            else: # Falta adaptar valor
+            if self.mando.connected:
+                com,valor = self.mando.leer_mando()
+            else:
                 com = input('Ingrese comando: ')
-                valor = 999
             if com =='q':
-                self.stopped=True
-                self.camara.stop()
-                print('Saliendo del modo teleoperado')
-                sleep(1)
+                self.stop()
                 return
             self.move(com,valor)
             self.encodeArduino()
+
+    def stop(self):
+        self.stopped = True
+        if self.camara:
+            self.camara.stop()
+        print('Saliendo del modo teleoperado')
+        sleep(1)
 
     def connect2Server(self):
         fh=open("ip.txt", 'r')
@@ -222,6 +188,9 @@ class Carrito:
             print(struct.pack(f">h{len(name)}s",len(name), name.encode()))
 
     def showInfo(self):
+        if self.camara is None:
+            print('Cámara no conectada: No es posible obtener imágenes')
+            return self
         t = Thread(target=self.show, args=())
         t.daemon = True
         t.start()
@@ -257,9 +226,6 @@ class Carrito:
             # print(f'Tamaño de la cola luego de enviar: {self.Q.qsize()}')
             
         cv2.destroyAllWindows()
-
-    def stop(self):
-        self.stopped = True
 
     def configDeteccion(self):
         self.showInfo()
