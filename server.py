@@ -151,7 +151,8 @@ class VideoReception(DataBase):
         self.dbConn.commit()
              
     def closeVideo(self):
-        self.result.release()
+        if self.result:
+            self.result.release()
 
 receptor = VideoReception()
 while True:
