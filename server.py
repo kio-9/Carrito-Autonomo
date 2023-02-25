@@ -115,7 +115,7 @@ class VideoReception(DataBase):
         t = time()
         while len(self.data) < payload_size:
             self.data += self.conn.recv(4096)
-            if time()-t>5:
+            if time()-t>50:
                 return False
         return True
 
@@ -166,13 +166,13 @@ while True:
             break
         # unpack image using pickle 
         frame = pickle.loads(frame_data, fix_imports=True, encoding="bytes")
-        frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
+        frame = cv2.imdecode(frame, cv2.IMREAD_GRAYSCALE)
 
         # Guardar info
         receptor.saveData(frame, vel, dir)
 
         # Mostrar imagen
-        cv2.putText(frame, f"Velocidad: {vel:.1f}\tDirección: {dir}°",(30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        cv2.putText(frame, f"Velocidad: {vel:.1f}        Direccion: {dir}°",(30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
         cv2.imshow('server',frame)
         cv2.waitKey(1)
     receptor.closeVideo()
