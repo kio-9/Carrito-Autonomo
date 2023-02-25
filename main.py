@@ -1,8 +1,8 @@
 from carrito import Carrito
-from prueba2_controlre import *
+from perifericos import Controller
 
 def menu(mando, description):
-    print('-'*50)
+    print('-'*100)
     if mando.connected:
         print(description)
         opt, _ = mando.obtener_comando()
@@ -19,12 +19,11 @@ if __name__ == '__main__':
       4.  End to end autonomy 
 Ingrese una de las opciones: """
     car = Carrito()
-    mando = Controller(debug=True)
     while True:
-        option = menu(mando, description)
+        option = menu(car.mando, description)
         if option == '1':
             ind = 'Mostrar datos:\n\tLocal -> 1\n\tRemoto -> 2\nIngrese una de las opciones: '
-            remoto = menu(mando, ind)
+            remoto = menu(car.mando, ind)
             remoto = False if remoto=='1' else True
             car.config(remote=remoto)
             car.teleop()

@@ -7,16 +7,17 @@ from threading import Thread
 from time import time, sleep
 import time
 from keras.models import load_model
+from multiprocessing import Process, Value, Event
 
-VEL_LIMIT = 6.6
+VEL_LIMIT = 5 #6.6
 ANG_LIMIT_SUP = 54
 ANG_LIMIT_INF = 15
 
 #Autonomo
-ANG_LIMIT_SUP_aut = 50 # IZQUIERDA
-ANG_SUP = 34 # LEVE IZQUIERDA (LIMITE SUPERIOR - RECTO)/2
-ANG_RECTO = 30
-ANG_INF = 25 # LEVE DERECHA (LIMITE INFERIOR - RECTO)/2
+ANG_LIMIT_SUP_aut = 60 # IZQUIERDA
+ANG_SUP = 50 # LEVE IZQUIERDA (LIMITE SUPERIOR - RECTO)/2
+ANG_RECTO = 40
+ANG_INF = 30 # LEVE DERECHA (LIMITE INFERIOR - RECTO)/2
 ANG_LIMIT_INF_aut = 18 # DERECHA 
 
 class Carrito:
@@ -44,6 +45,7 @@ class Carrito:
         self.img_counter = 0
         self.change = None
         self.stopped = False
+        self.p_stop = Value('i', 0)
         print(self)
 
     def __str__(self):
@@ -147,7 +149,7 @@ class Carrito:
         self.showInfo()
         while True:
             if self.mando.connected:
-                com,valor = self.mando.leer_mando()
+                com,valor = self.mando.obtener_comando()
             else:
                 com = input('Ingrese comando: ')
             if com =='q':
@@ -249,7 +251,7 @@ class Carrito:
         p_img = p_img/255.
         return p_img.reshape(1, 60, 64, 1)
    
-    def Ang_Select(prediccion): 
+    def Ang_Select(self, prediccion): 
         max_prob = prediccion.max()
         max_prob_pos = None
         for pos,i in enumerate(prediccion):
@@ -259,55 +261,95 @@ class Carrito:
         return max_prob_pos
     
     def GiveAngleAuto(self, posicion_prob):
+        v_cte = 4.8
         if posicion_prob == 0: 
             self.ang = ANG_LIMIT_INF_aut
-            self.vel = 3.3
             self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
             print("Movimiento brusco a la derecha")
         elif posicion_prob == 1:
             self.ang = ANG_INF
-            self.vel = 4.2
             self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
             print("Movimiento a la derecha")
         elif posicion_prob == 2:
             self.ang = ANG_RECTO
-            self.vel = 5
+            self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
             print("Movimiento defrente")
         elif posicion_prob == 3:
             self.ang = ANG_SUP
-            self.vel = 4.2
             self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
             print("Movimiento a la izquierda")
         else:
             self.ang = ANG_LIMIT_SUP_aut
-            self.vel = 3.3
             self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
             print("Movimiento brusco a la izquierda")
-    
-    def Mode_Autonomo(self):
-        t = Thread(target=self.autonomo, args=())
-        t.daemon = True
-        t.start()
-        return self
-        
+         
     def autonomo(self):
-        modelo = load_model('modelo_alvinn.h5')
+        modelo = load_model('modelo_test1.h5')
         modelo.summary()
+        def exit(stop):
+            while True:
+                com, _ = self.mando.leer_mando()
+                if com == 'q':
+                    break
+            stop.set()
+        p_stop = Event()
+        t = Process(target=exit, args=(p_stop,))
+        t.start()
         while True:
             t = time.time()
             img = self.camara.get_rtImg()
+            img2 = img
             img = self.img_preprocess(img)
             prediccion = modelo.predict(img)
             print(prediccion)
-            print(f'Tiempo transcurrido: {time.time()-t}')
-            pos_prediccion = Ang_Select(prediccion[0])
+            curr_vel=self.vel
+            curr_ang=self.ang
+            pos_prediccion = self.Ang_Select(prediccion[0])
             self.GiveAngleAuto(pos_prediccion)
-            self.encodeArduino()
-            if self.stopped:
+            self.img_counter += 1
+            print(f'Tiempo transcurrido: {time.time()-t}')
+            if p_stop.is_set():
+                self.stopped = True
                 self.camara.stop()
+                self.vel = 0
+                self.change = 'v'
+                self.encodeArduino()
                 print('Saliendo del modo autonomo')
                 sleep(1)
+                self.stopped = False
+                p_stop.clear()
                 return
+            continue
+            # Transmit data
+            if self.img_counter % 5 != 0:
+               continue
+            #t_ant1 = time()
+            t = time.time()
+            _, image = cv2.imencode('.jpg', img2, self.encode_param)
+            data = pickle.dumps(image, 0)
+            size = len(data)
+            self.client_socket.sendall(struct.pack(">hfhL", self.img_counter, curr_vel, curr_ang, size) + data)  
+            print(f'Tiempo transcurrido envio de frame: {time.time()-t}') 
 
 if __name__ == '__main__':
     opt = input('1->Local, 2->remoto : ')

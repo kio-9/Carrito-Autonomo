@@ -175,7 +175,7 @@ class Controller:
         # Controller options
         self.debug = debug
         self.config = 'analog'
-        self.ANGLES = [0, 15, 35, 50, 70]
+        self.ANGLES = [20, 30, 40, 50, 60]
         self.index = 2
         
     def obtener_comando(self):
@@ -199,6 +199,8 @@ class Controller:
             if event.value == 0: # Button released
                 return None, None
             boton = self.botones.get(str(event.code), 'no c') 
+            #print(boton)
+            
             return self.__parseButton(boton)
         elif event.type == ecodes.EV_ABS: # Directional sticks
             absevent = categorize(event)
@@ -208,6 +210,7 @@ class Controller:
 
     def __parseButton(self, boton):
         com = None
+        
         if boton == 'x_Btn':
             com = '4'
         elif boton == 'cuadrado_Btn':
@@ -219,7 +222,8 @@ class Controller:
         elif boton == 'l1_Btn':
             com = 'q'
         elif boton == 'r1_Btn':
-            com = '1'
+            self.index = 2
+            return 'd', self.ANGLES[self.index]
         elif boton == 'back_Btn': 
             com = None
             self.index = 2
@@ -228,7 +232,8 @@ class Controller:
         elif boton == 'start_Btn':
             com = '1'
         else:
-            print('Botón no mapeado') 
+            print('Botón no mapeado')
+            print(f'boton = {boton}')
         if self.debug:
             print(f'{boton}: {com}')
         return com, None
@@ -249,9 +254,9 @@ class Controller:
             return None, None
 
     def __angIncremental(self, valor):
-        if valor == 0 or self.index+valor not in range(len(self.ANGLES)):
+        if valor == 0 or self.index-valor not in range(len(self.ANGLES)):
             return None, None
-        self.index += valor
+        self.index -= valor
         d = 'a' if valor<0 else 'd'
         if self.debug:
             print(f'{d}: {self.ANGLES[self.index]}')
