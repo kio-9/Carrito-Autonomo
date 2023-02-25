@@ -1,55 +1,130 @@
-from perifericos import Camara, Arduino
+from perifericos import Camara, Arduino, Controller
 import cv2
 import pickle
 import socket
 import struct
 from threading import Thread
 from time import time, sleep
+import time
+from keras.models import load_model
+from multiprocessing import Process, Value, Event
 
-VEL_LIMIT = 300
-ANG_LIMIT = 70
+VEL_LIMIT = 5 #6.6
+ANG_LIMIT_SUP = 54
+ANG_LIMIT_INF = 15
+
+#Autonomo
+ANG_LIMIT_SUP_aut = 60 # IZQUIERDA
+ANG_SUP = 50 # LEVE IZQUIERDA (LIMITE SUPERIOR - RECTO)/2
+ANG_RECTO = 40
+ANG_INF = 30 # LEVE DERECHA (LIMITE INFERIOR - RECTO)/2
+ANG_LIMIT_INF_aut = 18 # DERECHA 
 
 class Carrito:
 
-    def __init__(self, remote=False, segmentateCam = False):
+    def __init__(self, remote=False, segmentateCam = False, training = 0):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]
-        self.camara = Camara(segmentate=segmentateCam)
+        self.mando = Controller(debug=True)
+        try:
+            self.camara = Camara(segmentate=segmentateCam)
+        except ConnectionError:
+            self.camara = None
+        self.training = training
         try:
             self.arduino = Arduino()
         except:
-            print("arduino no conectado")
-        self.remote = remote
-        if remote:
+            self.arduino = None
+            print('Puerto de arduino no encontrado')
+        print(self.camara)
+        self.remote = remote if self.camara is not None else False
+        if self.remote:
             self.connect2Server()
-        self.ang = 20
+        self.ang = 30
         self.vel = 0
         self.img_counter = 0
         self.change = None
         self.stopped = False
+        self.p_stop = Value('i', 0)
+        print(self)
 
-    def move(self, comm):
-        if comm not in 'wasdx':
-            print('Comando no válido')
+    def __str__(self):
+        msg = '_'*100
+        msg += '\nEstado del Carrito:\n'
+        msg += "Mando no conectado, control por teclado activado\n" if not self.mando.connected else "Mando conectado\n"
+        msg += "Cámara no conectada\n" if not self.camara else "Cámara conectada\n"
+        msg += "Arduino no conectado\n" if not self.arduino else "Arduino conectado\n"
+        msg += '_'*100
+        return msg
+
+    def config(self, remote=False, segmentateCam = False, training = 0):
+        self.training = training
+        if not remote:
             return
-        if comm == 'w' and self.vel < VEL_LIMIT:
-            self.vel += 1
+        self.remote = remote if self.camara is not None else False
+        if not self.remote:
+            print('No es posible conectarse al servidor sin cámara')
+            return
+        self.connect2Server()
+
+    def TecladoLogic(self,comm):
+        if self.vel == 0 and comm in 'xw':
+            self.vel = 3 if comm == 'w' else -3
+        if comm == 'w' and self.vel <= VEL_LIMIT:
+            #Tecla avanzar, incrementamos la velocidad en 0.05
+            self.vel = self.vel + 0.05
             self.change = 'v'
-        elif comm == 'a' and self.ang < ANG_LIMIT:
-            self.ang += 5
+        elif comm == 'a' and self.ang <= ANG_LIMIT_SUP:
+            #Tecla hacia la derecha, incrementamos el ángulo en 5 grados
+            self.ang = self.ang + 5
+            self.change = 'a'
+        elif comm == 's':
+            #Tecla para detener por completo
+            self.vel = 0
+            self.change = 'v'
+            self.ang = 30
+        elif comm == 'd' and self.ang >= ANG_LIMIT_INF:
+            #Tecla hacia la izquierda, decremento en 5 grados 
+            self.ang = self.ang - 5
+            self.change = 'a'
+        elif comm == 'x' and self.vel >= -VEL_LIMIT:
+            self.vel = self.vel-0.05
+            self.change = 'v'
+
+    def MandoLogic(self,comm,valor):
+        # Saturadores
+        if comm == 'd' and valor < ANG_LIMIT_INF:
+            valor = ANG_LIMIT_INF
+        if comm == 'a' and valor > ANG_LIMIT_SUP:
+            valor = ANG_LIMIT_SUP
+        # Guardar valores
+        if comm in 'wx':
+            self.vel = valor 
+            self.change = 'v'
+        elif comm in 'da':
+            self.ang = valor
             self.change = 'a'
         elif comm == 's':
             self.vel = 0
             self.change = 'v'
-        elif comm == 'd' and self.ang > 0:
-            self.ang -= 5
-            self.change = 'a'
-        elif comm == 'x' and self.vel > -VEL_LIMIT:
-            self.vel -= 1
-            self.change = 'v'
+        else:
+            print('Comando no válido')
 
+    def move(self, comm, valor):
+        ## Modificado - Verificamos que el mando está conectado
+        if not self.mando.connected:
+            self.TecladoLogic(comm,valor)
+        else:
+            self.MandoLogic(comm,valor)
+        
     def showControls(self):
-        ctrls = "Controles:\n\tw: avanzar\n\ta: izquierda\n\ts: stop\n\td: derecha\n\tx: retroceder"
+        print('Controles')
+        if not self.mando.connected:
+            ctrls = "\tw: avanzar\n\ta: izquierda\n\ts: stop\n\td: derecha\n\tx: retroceder"
+        elif self.mando.config == 'analog':
+            ctrls = '\tJoystick izq: avanzar - retroceder\n\tJoystick der: derecha-izquierda'
+        else:
+            ctrls = '\tJoystick der: avanzar - retroceder\n\tCruceta: derecha-izquierda'
         print(ctrls)
 
     def encodeArduino(self):
@@ -61,10 +136,11 @@ class Carrito:
             comm = 'G0'
         else:
             sign = '+' if self.vel >= 0 else ''
-            num = 3 if self.vel > 0 else -3
-            num += self.vel/100
-            comm = f'G{sign}{num:.2f}'
+            comm = f'G{sign}{self.vel:.2f}'
         print(comm)
+        if self.arduino is None:
+            print('Arduino no conectado: no se pueden activar motores')
+            return
         self.arduino.sendCommand(comm)
         self.change = None
 
@@ -72,23 +148,51 @@ class Carrito:
         self.showControls()
         self.showInfo()
         while True:
-            com = input('Ingrese comando: ')
+            if self.mando.connected:
+                com,valor = self.mando.obtener_comando()
+            else:
+                com = input('Ingrese comando: ')
             if com =='q':
-                self.stopped=True
-                self.camara.stop()
-                print('Saliendo del modo teleoperado')
-                sleep(1)
+                self.stop()
                 return
-            self.move(com)
+            self.move(com,valor)
             self.encodeArduino()
 
+    def stop(self):
+        self.stopped = True
+        if self.camara:
+            self.camara.stop()
+        print('Saliendo del modo teleoperado')
+        sleep(1)
+
     def connect2Server(self):
-        url = input('Ingrese dirección IP: ') #'4.tcp.ngrok.io'
-        port = int(input('Ingrese puerto: '))
-        self.client_socket.connect((url, port))
+        fh=open("ip.txt", 'r')
+        ip=[line.rstrip() for line in fh]
+        url = input(f'Ingrese dirección IP ({ip[0]}): ') #'4.tcp.ngrok.io'
+        if not url:
+            url=ip[0]
+        port =input(f'Ingrese puerto ({ip[1]}): ')
+        if not port:
+            port=ip[1]
+        if url != ip[0] or port != ip[1]:
+            with open("ip.txt", 'w') as f:
+                f.write('\n'.join([url, port]))
+        self.client_socket.connect((url, int(port)))
+        self.sendInit2Server()
+
+    def sendInit2Server(self):
         self.client_socket.sendall(struct.pack(">hh", *self.camara.getImgSize()))
+        self.client_socket.sendall(struct.pack(">h", self.training))
+        if self.training:
+            name = input('Ingrese nombre de entrenamiento: ')
+            self.client_socket.sendall(struct.pack(">h", len(name) ))
+            self.client_socket.sendall(struct.pack(f">{len(name)}s", name.encode() ))
+            print(struct.pack(f">h{len(name)}s",len(name), name.encode()))
 
     def showInfo(self):
+        if self.camara is None:
+            print('Cámara no conectada: No es posible obtener imágenes')
+            return self
         t = Thread(target=self.show, args=())
         t.daemon = True
         t.start()
@@ -96,37 +200,34 @@ class Carrito:
 
     def show(self):
         self.camara.start()
-        t_ant = time()
+        #t_ant = time()
         while True:
             if self.stopped:
                 break
             frame = self.camara.getFrames()
             curr_vel=self.vel
             curr_ang=self.ang
-            fps = 1/(time()-t_ant)
-            cv2.putText(frame, f"FPS: {30 if fps>30 else fps:.1f}",(520, 30), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            t_ant = time()
+            #fps = 1/(time()-t_ant)
+            #cv2.putText(frame, f"FPS: {30 if fps>30 else fps:.1f}",(520, 30), 
+                        #cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            #t_ant = time()
             if not self.remote:
                 cv2.imshow('Frame', frame)
                 cv2.waitKey(1)
                 continue
             self.img_counter += 1
             # Transmit data
-            if self.img_counter % 20 != 0:
+            if self.img_counter % 5 != 0:
                continue
-            t_ant1 = time()
+            #t_ant1 = time()
             _, image = cv2.imencode('.jpg', frame, self.encode_param)  
             data = pickle.dumps(image, 0)
             size = len(data)
             self.client_socket.sendall(struct.pack(">hfhL", self.img_counter, curr_vel, curr_ang, size) + data)
-            print(time()-t_ant1)
+            #print(time()-t_ant1)
             # print(f'Tamaño de la cola luego de enviar: {self.Q.qsize()}')
             
         cv2.destroyAllWindows()
-
-    def stop(self):
-        self.stopped = True
 
     def configDeteccion(self):
         self.showInfo()
@@ -143,6 +244,112 @@ class Carrito:
                 sleep(1)
                 break
             self.camara.houghParams[key]=int(command[1:]) if key!=1 else int(command[1:])/100
+
+    def img_preprocess(self, img):
+        p_img = cv2.resize(img, (64, 60))
+        p_img = cv2.cvtColor(p_img, cv2.COLOR_BGR2GRAY)
+        p_img = p_img/255.
+        return p_img.reshape(1, 60, 64, 1)
+   
+    def Ang_Select(self, prediccion): 
+        max_prob = prediccion.max()
+        max_prob_pos = None
+        for pos,i in enumerate(prediccion):
+            if max_prob == i:
+                max_prob_pos = pos
+                break
+        return max_prob_pos
+    
+    def GiveAngleAuto(self, posicion_prob):
+        v_cte = 4.8
+        if posicion_prob == 0: 
+            self.ang = ANG_LIMIT_INF_aut
+            self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
+            print("Movimiento brusco a la derecha")
+        elif posicion_prob == 1:
+            self.ang = ANG_INF
+            self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
+            print("Movimiento a la derecha")
+        elif posicion_prob == 2:
+            self.ang = ANG_RECTO
+            self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
+            print("Movimiento defrente")
+        elif posicion_prob == 3:
+            self.ang = ANG_SUP
+            self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
+            print("Movimiento a la izquierda")
+        else:
+            self.ang = ANG_LIMIT_SUP_aut
+            self.change = 'a'
+            self.encodeArduino()
+            self.vel = v_cte
+            self.change = 'v'
+            self.encodeArduino()
+            print("Movimiento brusco a la izquierda")
+         
+    def autonomo(self):
+        modelo = load_model('modelo_test1.h5')
+        modelo.summary()
+        def exit(stop):
+            while True:
+                com, _ = self.mando.leer_mando()
+                if com == 'q':
+                    break
+            stop.set()
+        p_stop = Event()
+        t = Process(target=exit, args=(p_stop,))
+        t.start()
+        while True:
+            t = time.time()
+            img = self.camara.get_rtImg()
+            img2 = img
+            img = self.img_preprocess(img)
+            prediccion = modelo.predict(img)
+            print(prediccion)
+            curr_vel=self.vel
+            curr_ang=self.ang
+            pos_prediccion = self.Ang_Select(prediccion[0])
+            self.GiveAngleAuto(pos_prediccion)
+            self.img_counter += 1
+            print(f'Tiempo transcurrido: {time.time()-t}')
+            if p_stop.is_set():
+                self.stopped = True
+                self.camara.stop()
+                self.vel = 0
+                self.change = 'v'
+                self.encodeArduino()
+                print('Saliendo del modo autonomo')
+                sleep(1)
+                self.stopped = False
+                p_stop.clear()
+                return
+            continue
+            # Transmit data
+            if self.img_counter % 5 != 0:
+               continue
+            #t_ant1 = time()
+            t = time.time()
+            _, image = cv2.imencode('.jpg', img2, self.encode_param)
+            data = pickle.dumps(image, 0)
+            size = len(data)
+            self.client_socket.sendall(struct.pack(">hfhL", self.img_counter, curr_vel, curr_ang, size) + data)  
+            print(f'Tiempo transcurrido envio de frame: {time.time()-t}') 
 
 if __name__ == '__main__':
     opt = input('1->Local, 2->remoto : ')
