@@ -1,5 +1,6 @@
 *.avi
 *.sqlite
+*.npy
 model_summaries/*
 training_data/*
 # Byte-compiled / optimized / DLL files
