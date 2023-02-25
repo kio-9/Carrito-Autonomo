@@ -1,3 +1,7 @@
+*.avi
+*.sqlite
+model_summaries/*
+training_data/*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
