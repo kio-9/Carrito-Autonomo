@@ -1,0 +1,8 @@
+x_Btn,304
+cuadrado_Btn,307
+triangulo_Btn,308
+circulo_Btn,305
+l1_Btn,310
+r1_Btn,311
+back_Btn,314
+start_Btn,315

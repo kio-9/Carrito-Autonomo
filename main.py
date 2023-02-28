@@ -1,5 +1,5 @@
-from carrito import Carrito
-from perifericos import Controller
+from src.carrito import Carrito
+from src.perifericos import Controller
 
 def menu(mando, description):
     print('-'*100)

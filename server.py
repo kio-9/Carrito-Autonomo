@@ -15,7 +15,7 @@ HOST=''
 PORT=8490
 
 class DataBase:
-    dbName = 'datos.sqlite'
+    dbName = 'training_data/datos_finales.sqlite'
     dbConn = None
     cur = None
 
@@ -115,7 +115,7 @@ class VideoReception(DataBase):
         t = time()
         while len(self.data) < payload_size:
             self.data += self.conn.recv(4096)
-            if time()-t>50:
+            if time()-t>2:
                 return False
         return True
 
@@ -166,8 +166,8 @@ while True:
             break
         # unpack image using pickle 
         frame = pickle.loads(frame_data, fix_imports=True, encoding="bytes")
-        frame = cv2.imdecode(frame, cv2.IMREAD_GRAYSCALE)
-
+        frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
+        # IMREAD_GRAYSCALE
         # Guardar info
         receptor.saveData(frame, vel, dir)
 
