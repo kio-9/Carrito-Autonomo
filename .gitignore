@@ -1,8 +1,7 @@
 *.avi
 *.sqlite
 *.npy
-models/*
-model_summaries/*
+*.h5
 training_data/*
 # Byte-compiled / optimized / DLL files
 __pycache__/
