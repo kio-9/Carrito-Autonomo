@@ -10,6 +10,8 @@ Proyecto del curso de vehículos autónomos
 - Motor Driver L298N
 - Motores DC
 - Reguladores Step Down: L2596s y XL4015
+- Baterías (4) Li-Ion 18650 de 3.7 VDC
+- Batería LiPo 3S de 2200 mAh
 ## Conexiones
 ![](https://github.com/kio-9/Carrito-Autonomo/blob/main/imagenes/conexiones.jfif)
 
