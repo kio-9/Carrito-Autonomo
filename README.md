@@ -3,6 +3,14 @@ Proyecto del curso de vehículos autónomos
 ## Materiales
 ## Conexiones
 ![](https://github.com/kio-9/Carrito-Autonomo/blob/main/imagenes/conexiones.jfif)
+Utilizar la siguiente definición de pines para la conexión entre driver, servomotor y arduino
+#define MOTOR1_IN1 2
+#define MOTOR1_IN2 3
+#define MOTOR2_IN3 4
+#define MOTOR2_IN4 5
+#define PWM_MOTOR1 6
+#define PWM_MOTOR2 7
+#define PWM_SERVO 9
 ## Diseño Mecánico
 ## Algoritmos de navegación
 ## Manual de uso 
