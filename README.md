@@ -12,6 +12,9 @@ Proyecto del curso de vehículos autónomos
 - Reguladores Step Down: L2596s y XL4015
 - Baterías (4) Li-Ion 18650 de 3.7 VDC
 - Batería LiPo 3S de 2200 mAh
+- Cables AWG 22 (datos) y AWG 16 (Alimentación)
+- Borneras aéreas PVC
+- Conector Jack
 ## Conexiones
 ![](https://github.com/kio-9/Carrito-Autonomo/blob/main/imagenes/conexiones.jfif)
 
