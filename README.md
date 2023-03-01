@@ -4,13 +4,13 @@ Proyecto del curso de vehículos autónomos
 ## Conexiones
 ![](https://github.com/kio-9/Carrito-Autonomo/blob/main/imagenes/conexiones.jfif)
 Utilizar la siguiente definición de pines para la conexión entre driver, servomotor y arduino
-#define MOTOR1_IN1 2
-#define MOTOR1_IN2 3
-#define MOTOR2_IN3 4
-#define MOTOR2_IN4 5
-#define PWM_MOTOR1 6
-#define PWM_MOTOR2 7
-#define PWM_SERVO 9
+- MOTOR1_IN1: PIN2
+- MOTOR1_IN2: PIN3
+- MOTOR2_IN3: PIN4
+- MOTOR2_IN4: PIN5
+- PWM_MOTOR1: PIN6
+- PWM_MOTOR2: PIN7
+- PWM_SERVO:  PIN9
 ## Diseño Mecánico
 ## Algoritmos de navegación
 ## Manual de uso 
