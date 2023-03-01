@@ -2,6 +2,7 @@
 Proyecto del curso de vehículos autónomos
 ## Materiales
 ## Conexiones
+https://github.com/kio-9/Carrito-Autonomo/blob/main/imagenes/conexiones.jfif
 ## Diseño Mecánico
 ## Algoritmos de navegación
 ## Manual de uso 
