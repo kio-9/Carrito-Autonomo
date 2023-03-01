@@ -1,6 +1,15 @@
 # Carrito-Autonomo
 Proyecto del curso de vehículos autónomos
 ## Materiales
+- Arduino Nano
+- Wireless Halion GamePad
+- Seeed Studio reComputer J1020 (basado en Jetson Nano)
+- Antena Wifi
+- Cámara (V-CAM PRO SX350)
+- ServoMotor MG996R
+- Motor Driver L298N
+- Motores DC
+- Reguladores Step Down: L2596s y XL4015
 ## Conexiones
 ![](https://github.com/kio-9/Carrito-Autonomo/blob/main/imagenes/conexiones.jfif)
 
