@@ -26,8 +26,7 @@ Utilizar la siguiente definición de pines para la conexión entre driver, servo
 - PWM_MOTOR1: PIN6
 - PWM_MOTOR2: PIN7
 - PWM_SERVO:  PIN9
-## Diseño Mecánico
-## Algoritmos de navegación
+
 ## Manual de uso 
 Conexión por ssh desde una computadora hacia la jetson
 ```
